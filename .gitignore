@@ -1,0 +1,10 @@
+Debug/
+.settings/
+*.launch
+.cproject
+.project
+Inc/CMSIS
+Startup/
+Src/syscalls.c
+Src/sysmem.c
+*.ld
