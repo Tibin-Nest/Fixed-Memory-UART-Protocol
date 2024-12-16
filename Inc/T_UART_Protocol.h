@@ -32,8 +32,11 @@
 #define T_UART_PROTOCOL_H_
 
 #include "uart.h"
+
+// This should be changed to corresponding controller
 #include "stm32f4xx.h"
 
+// Choose the USART peripheral that is being used
 #if !defined(USARTx)
 	#define USARTx			USART2
 #endif
@@ -42,7 +45,6 @@
 	#define NULL			0
 #endif
 
-//#define USART				2
 
 #define TIMER_CLK			8000000				// Clock frequency to the timer
 #define TIMEOUT_TIMER		2					// Which timer to use for timeout (TIM2, TIM3, TIM4)
@@ -54,7 +56,7 @@
 //#define START_BYTE		(0b10101010)
 //#define END_BYTE			(0b11001100)
 #define START_BYTE			'?'
-#define END_BYTE			'+'
+//#define END_BYTE			'+'
 
 #define GET_ACK				0					// If 1, ACK or NACK is sent for every frame
 

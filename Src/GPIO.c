@@ -45,6 +45,16 @@ void setAlternateFunction(GPIO_TypeDef* GPIOx, uint8_t pinNumber, uint8_t altern
 
 void writeToPin(GPIO_TypeDef* GPIOx, uint8_t pinNumber, STATE state)
 {
-	GPIOx->ODR &= ~(1 << pinNumber);
-	GPIOx->ODR |= (state << pinNumber);
+//	GPIOx->ODR &= ~(1 << pinNumber);
+//	GPIOx->ODR |= (state << pinNumber);
+
+	switch(state)
+	{
+	case LOW:
+		GPIOx->ODR &= ~(state << pinNumber);
+		break;
+	case HIGH:
+		GPIOx->ODR |= (state << pinNumber);
+		break;
+	}
 }

@@ -18,7 +18,8 @@
 #define EEPROM_PROCESSING_H_
 
 #include "T_UART_Protocol.h"
-#include "I2C_EEPROM.h"
+#include "stdio.h"
+//#include "I2C_EEPROM.h"
 
 #define DEVICE_ADDR (0b10100000)
 

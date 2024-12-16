@@ -30,7 +30,7 @@ int main(void)
 		SCB->CPACR |= ((3UL << 20U)|(3UL << 22U));  /* set CP10 and CP11 Full Access */
 	#endif
 
-	ProtocolSetup(200);
+	ProtocolSetup(2000);
 
 
     /* Loop forever */

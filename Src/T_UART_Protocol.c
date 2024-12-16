@@ -16,6 +16,11 @@
 #define RX_BUFFER					(rxBuffer.dataBuffer)
 #define TX_BUFFER					(txBuffer.dataBuffer)
 
+#define CRC_POLYNOMIAL				(0x70)
+#define CRC_INIT					(0x00)
+
+#define CRC_START_VALUE				(CRC_INIT ^ START_BYTE)
+
 #if(GET_ACK == 1)
 	bool sendACK = true;
 #endif
@@ -35,6 +40,7 @@ static void setupTimeoutTimer();
 static void stopTimeoutTimer();
 static void startTimeoutTimer(uint32_t idleTimeout_ms);
 
+
 uint32_t txFrameCount = 0;
 uint32_t rxFrameCount = 0;
 
@@ -47,6 +53,11 @@ bool hasDataToRead = false;
 bool gotStartByte = false;
 bool sentStartByte = false;
 
+bool gotCRC = false;
+
+uint8_t crcRx = CRC_INIT;
+uint8_t crcTx = CRC_INIT;
+
 uint32_t timeoutDuration = 1000;
 
 TIM_TypeDef* timeoutTimer;
@@ -57,6 +68,8 @@ STATUS ProtocolSetup(uint32_t timeoutDuration_ms)
 	setupTimeoutTimer();
 	stopTimeoutTimer();
 	timeoutDuration = timeoutDuration_ms;
+	crcRx = CRC_START_VALUE;
+	crcTx = CRC_START_VALUE;
 	UART_start_Rx();
 	return STATUS_OK;
 }
@@ -90,6 +103,8 @@ static void USARTx_IRQHandler_Func()
 		{
 			gotStartByte = gotStartByte;
 		}
+
+		// Wait for start byte
 		if(!gotStartByte)
 		{
 			if(ch != START_BYTE)
@@ -98,54 +113,67 @@ static void USARTx_IRQHandler_Func()
 				return;
 			}
 
+			// Reset CRC
+			crcRx = CRC_START_VALUE;
+
 			gotStartByte = true;
 			startTimeoutTimer(timeoutDuration);
 		}
-		else
+		// Read bytes till count is DATA_WIDTH
+		else if(rxBuffer.byteCount < DATA_WIDTH)
 		{
-			// Read bytes till count is DATA_WIDTH
-			if(rxBuffer.byteCount < DATA_WIDTH)
+			RX_BUFFER[RX_WRITE_OFFSET + rxBuffer.byteCount++] = ch;
+
+			// Update CRC
+			crcRx ^= ch;
+			for(uint8_t bit = 0; bit < 8; bit++)
 			{
-				RX_BUFFER[RX_WRITE_OFFSET + rxBuffer.byteCount++] = ch;
-			}
-
-			// If DATA_WIDTH bytes are received, check if byte is Endbyte
-			else
-			{
-				stopTimeoutTimer();
-
-				rxBuffer.byteCount = 0;
-				gotStartByte = false;
-
-				// If not end byte
-				if(ch != END_BYTE)
+				if(crcRx & 0b10000000)
 				{
-					// Do something if needed
-
-					#if(GET_ACK == 1)			// Set flag to send NACK
-						sendACK = false;
-					#endif
+					crcRx = (crcRx << 1) ^ CRC_POLYNOMIAL;
 				}
-
-				// If it is end byte
 				else
 				{
-					// Do something if needed
-
-
-					// Increment the writeIndex cyclicly
-					rxBuffer.writeIndex++;
-					if(rxBuffer.writeIndex == BUFFER_SIZE)
-					{
-						rxBuffer.writeIndex = 0;
-					}
-
-					hasDataToRead = true;
-
-					#if(GET_ACK == 1)			// Set flag to send ACK
-						sendACK = true;
-					#endif
+					crcRx = crcRx << 1;
 				}
+
+			}
+		}
+		// Last byte
+		else
+		{
+			stopTimeoutTimer();
+
+			rxBuffer.byteCount = 0;
+			gotStartByte = false;
+
+			// If not CRC
+			if(ch != crcRx)
+			{
+				// Do something if needed
+
+				#if(GET_ACK == 1)			// Set flag to send NACK
+					sendACK = false;
+				#endif
+			}
+
+			// If it is CRC
+			else
+			{
+				// Do something if needed
+
+				// Increment the writeIndex cyclicly
+				rxBuffer.writeIndex++;
+				if(rxBuffer.writeIndex == BUFFER_SIZE)
+				{
+					rxBuffer.writeIndex = 0;
+				}
+
+				hasDataToRead = true;
+
+				#if(GET_ACK == 1)			// Set flag to send ACK
+					sendACK = true;
+				#endif
 			}
 		}
 	}
@@ -163,37 +191,50 @@ static void USARTx_IRQHandler_Func()
 
 		if(!sentStartByte)
 		{
+			// Reset CRC
+			crcTx = CRC_START_VALUE;
+
 			// Send Start Byte
 			sentStartByte = true;
 			UART_send(START_BYTE);
 		}
+		// Send DATA_WIDTH bytes from buffer
+		else if(txBuffer.byteCount < DATA_WIDTH)
+		{
+			uint8_t ch = TX_BUFFER[TX_READ_OFFSET + txBuffer.byteCount++];
+			UART_send(ch);
 
+			// Update CRC
+			crcTx ^= ch;
+			for(uint8_t bit = 0; bit < 8; bit++)
+			{
+				if(crcTx & 0b10000000)
+				{
+					crcTx = (crcTx << 1) ^ CRC_POLYNOMIAL;
+				}
+				else
+				{
+					crcTx = crcTx << 1;
+				}
+			}
+		}
+		// Send CRC
 		else
 		{
-			// Send DATA_WIDTH bytes from buffer
-			if(txBuffer.byteCount < DATA_WIDTH)
+			txBuffer.byteCount = 0;
+			sentStartByte = false;
+
+			txBuffer.readIndex++;
+			if(txBuffer.readIndex == BUFFER_SIZE)
 			{
-				UART_send(TX_BUFFER[TX_READ_OFFSET + txBuffer.byteCount++]);
+				txBuffer.readIndex = 0;
 			}
-
-			// Send end byte
-			else
+			if(txBuffer.readIndex == txBuffer.writeIndex)
 			{
-				txBuffer.byteCount = 0;
-				sentStartByte = false;
-
-				txBuffer.readIndex++;
-				if(txBuffer.readIndex == BUFFER_SIZE)
-				{
-					txBuffer.readIndex = 0;
-				}
-				if(txBuffer.readIndex == txBuffer.writeIndex)
-				{
-					hasDataToSend = false;
-				}
-
-				UART_send(END_BYTE);
+				hasDataToSend = false;
 			}
+			UART_send(crcTx);
+
 		}
 	}
 }

@@ -13,6 +13,7 @@ uint8_t frameData[DATA_WIDTH];
 STATUS stringToInt(uint8_t startIndex, uint8_t* output, uint8_t* outIndex);
 void testRead(uint8_t* buff, uint8_t Size);
 void testWrite(uint8_t* buff, uint8_t Size);
+void memset(uint8_t* buffer, uint8_t ch, uint32_t len);
 
 void processCommand()
 {
@@ -61,11 +62,11 @@ void processCommand()
 //				EEPROM_Read(DEVICE_ADDR, pageNo, byteOffset, 2, EEPROMData, DATA_WIDTH);
 				testRead(EEPROMData, DATA_WIDTH);
 
-				if(byteOffset + DATA_WIDTH > PAGE_SIZE)
-				{
-					pageNo++;
-					byteOffset = (byteOffset + DATA_WIDTH) - PAGE_SIZE;
-				}
+//				if(byteOffset + DATA_WIDTH > PAGE_SIZE)
+//				{
+//					pageNo++;
+//					byteOffset = (byteOffset + DATA_WIDTH) - PAGE_SIZE;
+//				}
 
 				dataSize -= DATA_WIDTH;
 			}
@@ -77,6 +78,7 @@ void processCommand()
 				dataSize = 0;
 			}
 
+			testRead(EEPROMData, dataSize);
 			while(writeFrameData(EEPROMData) == STATUS_BUFFER_FULL);
 		}
 //		startUARTTx();
@@ -127,11 +129,11 @@ void processCommand()
 				i = 0;
 
 				// Change the pageNo and byteOffset
-				if(byteOffset + sendSize > PAGE_SIZE)
-				{
-					pageNo++;
-					byteOffset = (byteOffset + sendSize) - PAGE_SIZE;
-				}
+//				if(byteOffset + sendSize > PAGE_SIZE)
+//				{
+//					pageNo++;
+//					byteOffset = (byteOffset + sendSize) - PAGE_SIZE;
+//				}
 			}
 			else
 			{
@@ -189,5 +191,17 @@ void testRead(uint8_t* buff, uint8_t Size)
 	for(int i = 0; i < Size; i++)
 	{
 		buff[i] = 'a' + (i % 26);
+	}
+}
+
+void memset(uint8_t* buffer, uint8_t ch, uint32_t len)
+{
+	if(buffer == NULL)
+	{
+		return;
+	}
+	while(len--)
+	{
+		buffer[len] = ch;
 	}
 }
